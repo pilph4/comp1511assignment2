@@ -30,30 +30,36 @@ and 799 to a card, so that I have my own way of making a deck.
 */
 
 typedef struct _history {
-
+    
 } history;
 
+
 typedef struct _pile {
-    int pileSize;
-    value *firstValue;
-    color *firstColor;
-    suit *firstSuit;
+    Node head;
 } pile;
+
+
+typedef struct _node {
+    Card value;
+    Node next;
+} node;
+
 
 typedef struct _player {
     pile hand;
     int points;
 } player;
 
+
 typedef struct _game {
     int totalDeckSize;
     pile originalDeck;
     pile discard;
     pile draw;
-    player *playerInfo;
+    player playerInfo[4];
     int turnNumber;
     direction currentDirection;
-    history *history;
+    history history[4];
 } game;
 
 Game newGame(int deckSize, value values[], color colors[], suit suits[]){
@@ -63,16 +69,7 @@ Game newGame(int deckSize, value values[], color colors[], suit suits[]){
     // the total number of cards we are given at the beginning
     new->totalDeckSize = deckSize;
 
-    // set up the discard pile
-    new->discard.pileSize = 1;
-    new->discard.firstValue = calloc(deckSize, sizeof(value));
-    new->discard.firstColor = calloc(deckSize, sizeof(color));
-    new->discard.firstSuit = calloc(deckSize, sizeof(suit));
 
-    // put the card after all the dealing in the discard pile
-    new->draw.firstValue[0] = values[28];
-    new->draw.firstColor[0] = colors[28];
-    new->draw.firstSuit[0] = suits[28];
 
 
     // set up the draw pile
@@ -127,6 +124,17 @@ Game newGame(int deckSize, value values[], color colors[], suit suits[]){
 
     new->turnNumber = 0;
     new->currentDirection = CLOCKWISE;
+
+    // set up the discard pile
+    new->discard.pileSize = 1;
+    new->discard.firstValue = calloc(deckSize, sizeof(value));
+    new->discard.firstColor = calloc(deckSize, sizeof(color));
+    new->discard.firstSuit = calloc(deckSize, sizeof(suit));
+
+    // put the card after all the dealing in the discard pile
+    new->draw.firstValue[0] = values[28];
+    new->draw.firstColor[0] = colors[28];
+    new->draw.firstSuit[0] = suits[28];
 
     return new;
 }
@@ -225,15 +233,59 @@ int turnMoves(Game game, int n){
 void playMove(Game game, playerMove move){
     assert(isValidMove(Game game, playerMove move) == TRUE);
     if(move.action == DRAW_CARD){
-        int handSize = game->playerInfo[currentPlayer(game)].hand.pileSize + 1;
+        Card topCard =
+        assert(game->playerInfo[currentPlayer(game)]->pile != NULL);
+        Node newNode = calloc(1,sizeof(node));
+        assert(newNode != NULL);
+        newNode->next = NULL;
+        newNode->value = topCard;
 
+        if(list->head == NULL) { //list is empty
+            list->head = newNode;
+        } else { //list contains elements
+            Node curr = list->head;
+            while(curr->next != NULL){ //find node before null
+                curr = curr->next;
+            }
+            curr->next = newNode;
+    }
+}
 
         game->playerInfo[currentPlayer(game)].hand.firstValue =
     }
 
+}
 
+Card handCard(Game game, int n) {
+    int counter = 0;
+    Node curr = game->playerInfo[currentPlayer(game)]->hand->head->next;
+    while(counter < n) {
+        curr = curr->next;
+    }
+    Card card = curr->value;
 
+    return card;
+}
 
+int playerCardCount(Game game, int player){
+    int counter = 0;
+    Node curr = game->playerInfo[player]->hand->head;
+    while(curr->next != NULL){
+        curr = curr->next;
+        counter++;
+    }
+    return counter;
+}
+
+int handCardCount(Game game){
+    int counter = 0;
+    Node curr = game->playerInfo[currentPlayer(game)]->hand->head;
+    while(curr->next != NULL){
+        curr = curr->next;
+        counter++;
+    }
+    return counter;
+}
 
 
 
