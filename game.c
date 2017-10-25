@@ -33,12 +33,12 @@ and 799 to a card, so that I have my own way of making a deck.
 typedef struct _game {
     // info on the original deck
     int totalDeckSize;
-    List originalDeck;
+    cardList originalDeck;
 
 
     // the games active components
-    List draw;
-    List discard;
+    cardList draw;
+    cardList discard;
     int turnNumber;
     int currentPlayer;
     direction currentDirection;
@@ -48,51 +48,73 @@ typedef struct _game {
     // info relevant to each individual player
     player playerInfo[4];
 
+
+    // the move history
+    historyList history;
+
+
 } game;
 
-typedef struct _node *Node;
-typedef struct _list *List;
-
-typedef struct _hode *Hode;
-typedef struct _hist *Hist;
+typedef struct _cardlist *cardList;
+typedef struct _cardnode *cardNode;
 
 
-typedef struct _list {
-    Node head;
-} list;
+typedef struct _historylist *historyList;
+typedef struct _historynode *historyNode;
 
 
-typedef struct _node {
+typedef struct _movelist *moveList;
+typedef struct _movenode *moveNode;
+
+
+typedef struct _cardlist {
+    cardNode head;
+} cardlist;
+
+
+typedef struct _cardnode {
     Card value;
-    Node next;
-} node;
+    cardNode next;
+} cardnode;
 
-typedef struct _hist {
-    Hode head;
-} hist;
+typedef struct _historylist {
+    historyNode head;
+} historylist;
 
 
-typedef struct _hode {
-    action actionTaken;
-    Hode next;
-} hode;
+typedef struct _historynode {
+    int turnNumber;
+    int playerNumber;
+    moveList moveList;
+    historyNode next;
+} historynode;
+
+
+typedef struct _movelist {
+    moveNode head;
+} movelist;
+
+
+typedef struct _movenode {
+    playerMove move;
+    moveNode next;
+} movenode;
 
 
 typedef struct _player {
-    List hand;
-    Hist history;
+    cardList hand;
     int points;
 } player;
 
 
 // actions on card lists
-int listSize(List list);
-Card getNthCard(List list, int n);
-action getNthMove(Hist hist, int n);
-void putCardInList(List list, Card card);
-void removeCardFromHand(List list, Card card);
-void removeTopCard(List list);
-void freeEntireList(List list):
+int listSize(cardList list);
+Card getNthCard(cardList list, int n);
+action getNthMove(historyList hist, int n);
+void putCardInList(cardList list, Card card);
+void removeCardFromHand(cardList list, Card card);
+void removeTopCard(cardList list);
+void freeEntireList(cardList list):
 
 
 Game newGame(int deckSize, value values[], color colors[], suit suits[]){
@@ -104,13 +126,13 @@ Game newGame(int deckSize, value values[], color colors[], suit suits[]){
     new->winStatus = NOT_FINISHED;
     new->currentDirection = CLOCKWISE;
 // so far, so good.
-    new->originalDeck = calloc(1, sizeof(List));
+    new->originalDeck = calloc(1, sizeof(cardList));
     new->originalDeck->head = NULL;
 
-    new->draw = calloc(1, sizeof(List));
+    new->draw = calloc(1, sizeof(cardList));
     new->draw->head = NULL;
 
-    new->discard = calloc(1, sizeof(List));
+    new->discard = calloc(1, sizeof(cardList));
     new->discard->head = NULL;
 
 // but those are only the heads of the lists
@@ -289,7 +311,7 @@ int numCards(Game game){
 }
 
 int numOfSuit(Game game, suit suit){
-    Node curr = game->originalDeck->head;
+    cardNode curr = game->originalDeck->head;
     int suitCounter = 0;
     while(curr->next != NULL) {
         if(curr->card->sui = suit) {
@@ -312,7 +334,7 @@ int numOfSuit(Game game, suit suit){
 }
 
 int numOfColor(Game game, color color){
-    Node curr = game->originalDeck->head;
+    cardNode curr = game->originalDeck->head;
     int colorCounter = 0;
     while(curr->next != NULL) {
         if(curr->card->col = color) {
@@ -326,7 +348,7 @@ int numOfColor(Game game, color color){
 }
 
 int numOfValue(Game game, value value){
-    Node curr = game->originalDeck->head;
+    cardNode curr = game->originalDeck->head;
     int valueCounter = 0;
     while(curr->next != NULL) {
         if(curr->card->val = value) {
@@ -363,7 +385,7 @@ Card topDiscard(Game game){
 
 Card handCard(Game game, int n) {
     int counter = 0;
-    Node curr = game->playerInfo[currentPlayer(game)]->hand->head->next;
+    cardNode curr = game->playerInfo[currentPlayer(game)]->hand->head->next;
     while(counter < n) {
         curr = curr->next;
     }
@@ -382,12 +404,68 @@ int handCardCount(Game game){
 
 }
 
-// function yet to be implemented fully
 
 
 int turnMoves(Game game, int n){
-    [][][]
+    historyList history = game->history;
+    int moveCounter = 0;
+    if(history->head == NULL){
+        // do nothing
+    } else {
+        historyNode curr = history->head;
+        while(curr->next != NULL) {
+            moveCounter++;
+            curr = curr->next;
+        }
+
+    }
+    return moveCounter;
 }
+
+
+int numTurns(Game game) {
+    return currentTurn(game)-1;
+}
+
+
+
+playerMove pastMove(Game game, int turn, int move) {
+    assert(turn <= numturns(game));
+    int moveCounter = 0;
+    playerMove moveMade;
+    if(game->history->head == NULL) {
+        // do nothing
+    } else {
+        historyNode curr = game->history->head;
+        while(curr->turnNumber != turn) {
+            curr = curr->next;
+        }
+        moveNode mCurr = curr->moveList->head;
+        while(moveCounter != move) {
+            mCurr = mCurr->next;
+        }
+        moveMade = mCurr->move;
+    }
+    return moveMade;
+}
+
+int turnMoves(Game game, int turn) {
+    assert(turn <= numTurns(game) && turn >= 0);
+    int mistSize = 0;
+    historyNode curr = game->history->head;
+    while(curr->turnNumber != turn) {
+        curr = curr->next;
+    }
+    moveNode mCurr = curr->head;
+    while(mCurr->next != NULL) {
+        mistSize++;
+        mCurr = mCurr->next;
+    }
+    return mistSize;
+}
+
+
+// functions yet to be implemented fully
 
 
 int gameWinner(Game game) {
@@ -400,19 +478,17 @@ int gameWinner(Game game) {
 
 
 
-int numTurns(Game game);
 
 
 
-int isValidMove(Game game, playerMove move);
+int isValidMove(Game game, playerMove move){
+
+}
 
 
 
-playerMove pastMove(Game game, int turn, int move);
 
 
-
-int turnMoves(Game game, int turn);
 
 
 
@@ -440,10 +516,63 @@ void playMove(Game game, playerMove move){
 
 
 
-// my own functions, to do with card lists
+// my own functions, to do with card and history lists
 
-void putCardInList(List list, Card card){
-    Node new = calloc(1, sizeof(node));
+
+
+
+
+
+
+
+void removeCardFromHand(cardList list, Card card) {
+    
+}
+
+
+
+
+
+
+
+void removeTopCard(cardList list);
+
+void reviewPoints(Game game);
+
+
+
+void freeEntireList(cardList list) {
+    if(list->head == NULL) {
+        // do nothing
+    } else {
+        cardNode curr = list->head;
+        cardNode prev = curr;
+        while(curr->next != NULL) {
+            free(prev);
+            cardNode prev = curr;
+            curr = curr->next;
+        }
+    }
+    free(list);
+}
+
+int listSize(List list){
+    int counter = 0;
+    if (list->head == NULL) {
+        // do nothing
+    } else {
+        cardNode curr = list->head;
+        while(curr->next != NULL) {
+            curr = curr->next;
+            counter++;
+        }
+    }
+    return counter;
+}
+
+
+void putCardInList(cardList list, Card card){
+    cardNode new = calloc(1, sizeof(node));
     new->card = card;
     new->next = list->next;
     list->head = new;
