@@ -33,35 +33,10 @@ and 799 to a card, so that I have my own way of making a deck.
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "card.h"
-#include "game.h"
+#include "Card.h"
+#include "Game.h"
 
 
-typedef struct _game {
-    // info on the original deck
-    int totalDeckSize;
-    cardList originalDeck;
-
-
-    // the games active components
-    cardList draw;
-    cardList discard;
-    int turnNumber;
-    int currentPlayer;
-    int previousPlayer;
-    direction currentDirection;
-    int winStatus;
-
-
-    // info relevant to each individual player
-    player playerInfo[4];
-
-
-    // the move history
-    historyList history;
-
-
-} game;
 
 typedef struct _cardlist *cardList;
 typedef struct _cardnode *cardNode;
@@ -81,7 +56,7 @@ typedef struct _cardlist {
 
 
 typedef struct _cardnode {
-    Card value;
+    Card card;
     cardNode next;
 } cardnode;
 
@@ -115,8 +90,35 @@ typedef struct _player {
 } player;
 
 
+typedef struct _game {
+    // info on the original deck
+    int totalDeckSize;
+    cardList originalDeck;
+
+
+    // the games active components
+    cardList draw;
+    cardList discard;
+    int turnNumber;
+    int currentPlayer;
+    int previousPlayer;
+    direction currentDirection;
+    int winStatus;
+
+
+    // info relevant to each individual player
+    player playerInfo[4];
+
+
+    // the move history
+    historyList history;
+
+
+} game;
+
+
 // actions on card lists
-int listSize(cardList list);
+int handSize(cardList list);
 Card getNthCard(cardList list, int n);
 action getNthMove(historyList hist, int n);
 void putCardInList(cardList list, Card card);
@@ -128,12 +130,17 @@ void freeHistoryList(historyList list);
 void recordInHistory(Game game, playerMove move);
 void freeMoveList(moveList list);
 
-void drawFourCards(game);
-void drawTwoCards(game);
+void drawFourCards(Game game);
+void drawTwoCards(Game game);
+
+int valuesMatch(Card first, Card second);
+int colorsMatch(Card first, Card second);
+int suitsMatch(Card first, Card second);
 
 
 
-Game newGame(int deckSize, value values[], color colors[], suit suits[]){
+
+Game newGame(int deckSize, value values[], color colors[], suit suits[]) {
 // deep breaths. let's go.
     Game new = calloc(1, sizeof(game));
     new->totalDeckSize = deckSize;
@@ -157,6 +164,7 @@ Game newGame(int deckSize, value values[], color colors[], suit suits[]){
 // so first, the copy of the original deckSize
 
     int originalDeckCounter = 0;
+    int counter = 0;
     while(counter < deckSize) {
         Card toAssign = newCard(values[originalDeckCounter],
             colors[originalDeckCounter], suits[originalDeckCounter]);
@@ -192,7 +200,7 @@ Game newGame(int deckSize, value values[], color colors[], suit suits[]){
     while(dealingCounter < 28) {
         Card toAssign = newCard(values[dealingCounter],
             colors[dealingCounter], suits[dealingCounter]);
-        putCardInList(new->playerInfo[dealCounter%4].hand, toAssign);
+        putCardInList(new->playerInfo[dealingCounter%4].hand, toAssign);
         dealingCounter++;
     }
 
@@ -323,7 +331,7 @@ int numOfSuit(Game game, suit suit){
     cardNode curr = game->originalDeck->head;
     int suitCounter = 0;
     while(curr->next != NULL) {
-        if(curr->card->sui = suit) {
+        if(cardSuit(curr->card) == suit) {
             suitCounter++;
             curr = curr->next;
         } else {
@@ -346,7 +354,7 @@ int numOfColor(Game game, color color){
     cardNode curr = game->originalDeck->head;
     int colorCounter = 0;
     while(curr->next != NULL) {
-        if(curr->card->col = color) {
+        if(cardColor(curr->card) == color) {
             colorCounter++;
             curr = curr->next;
         } else {
@@ -360,7 +368,7 @@ int numOfValue(Game game, value value){
     cardNode curr = game->originalDeck->head;
     int valueCounter = 0;
     while(curr->next != NULL) {
-        if(curr->card->val = value) {
+        if(cardValue(curr->card) == value) {
             valueCounter++;
             curr = curr->next;
         } else {
@@ -384,7 +392,7 @@ int playerPoints(Game game, int player){
 }
 
 direction playDirection(Game game){
-    return game->direction;
+    return game->currentDirection;
 }
 
 Card topDiscard(Game game){
@@ -394,11 +402,11 @@ Card topDiscard(Game game){
 
 Card handCard(Game game, int n) {
     int counter = 0;
-    cardNode curr = game->playerInfo[currentPlayer(game)]->hand->head->next;
+    cardNode curr = game->playerInfo[currentPlayer(game)].hand->head->next;
     while(counter < n) {
         curr = curr->next;
     }
-    Card card = curr->value;
+    Card card = curr->card;
 
     return card;
 }
@@ -415,22 +423,6 @@ int handCardCount(Game game){
 
 
 
-int turnMoves(Game game, int n){
-    historyList history = game->history;
-    int moveCounter = 0;
-    if(history->head == NULL){
-        // do nothing
-    } else {
-        historyNode curr = history->head;
-        while(curr->next != NULL) {
-            moveCounter++;
-            curr = curr->next;
-        }
-
-    }
-    return moveCounter;
-}
-
 
 int numTurns(Game game) {
     return currentTurn(game)-1;
@@ -439,7 +431,7 @@ int numTurns(Game game) {
 
 
 playerMove pastMove(Game game, int turn, int move) {
-    assert(turn <= numturns(game));
+    assert(turn <= numTurns(game));
     int moveCounter = 0;
     playerMove moveMade;
     if(game->history->head == NULL) {
@@ -449,7 +441,7 @@ playerMove pastMove(Game game, int turn, int move) {
         while(curr->turnNumber != turn) {
             curr = curr->next;
         }
-        moveNode mCurr = curr->moveList->head;
+        moveNode mCurr = curr->moves->head;
         while(moveCounter != move) {
             mCurr = mCurr->next;
         }
@@ -460,23 +452,23 @@ playerMove pastMove(Game game, int turn, int move) {
 
 int turnMoves(Game game, int turn) {
     assert(turn <= numTurns(game) && turn >= 0);
-    int mistSize = 0;
+    int moveListSize = 0;
     historyNode curr = game->history->head;
     while(curr->turnNumber != turn) {
         curr = curr->next;
     }
-    moveNode mCurr = curr->head;
-    while(mCurr->next != NULL) {
-        mistSize++;
-        mCurr = mCurr->next;
+    moveNode moveCurr = curr->moves->head;
+    while(moveCurr->next != NULL) {
+        moveListSize++;
+        moveCurr = moveCurr->next;
     }
-    return mistSize;
+    return moveListSize;
 }
 
 
 // functions yet to be implemented fully
 
-
+/*
 int gameWinner(Game game) {
     int playerCounter = 0;
     int winner = NOT_WINNER;
@@ -484,12 +476,12 @@ int gameWinner(Game game) {
         if
     }
 }
+*/
 
 
 
 
-
-
+/*
 int isValidMove(Game game, playerMove move){
     // aaaaaaaaaaaaaaaaaaaaaaa.
     // deep breaths.
@@ -497,7 +489,7 @@ int isValidMove(Game game, playerMove move){
     int valid == TRUE;
     Card topOfDiscard = topDiscard(game);
     if(topOfDiscard.val == DRAW_TWO) {
-        if 
+        if
     }
 
 
@@ -515,7 +507,7 @@ int isValidMove(Game game, playerMove move){
 
 
 }
-
+*/
 
 
 
@@ -543,26 +535,29 @@ void playMove(Game game, playerMove move){
 
     }*/
 
-    assert(isValidMove(game, move));
+//    assert(isValidMove(game, move));
     cardList playersHand = game->playerInfo[currentPlayer(game)].hand;
+    int skipped = FALSE;
+    int current = game->currentPlayer;
+    int previous = game->previousPlayer;
     if(move.action == DRAW_CARD) {
         Card topOfDraw = getNthCard(game->draw, 1);
         putCardInList(playersHand, topOfDraw);
         removeTopCard(game->draw);
     }
     if(move.action == PLAY_CARD) {
-        putCardInList(game->discard, action.card);
-        removeCardFromHand(playersHand, action.card);
-        if(action.card->val == DECLARE) {
+        putCardInList(game->discard, move.card);
+        removeCardFromHand(playersHand, move.card);
+        if(cardValue(move.card) == DECLARE) {
             // [][][] does anything need to be put here, or is
             // this only relevant for the person whose turn is next?
-        } else if(action.card->val == ADVANCE) {
+        } else if(cardValue(move.card) == ADVANCE) {
             skipped = TRUE;
-        } else if(action.card->val == BACKWARDS) {
+        } else if(cardValue(move.card) == BACKWARDS) {
             if(game->currentDirection == CLOCKWISE) {
-                game->currentDirection == ANTICLOCKWISE;
+                game->currentDirection = ANTICLOCKWISE;
             } else {
-                game->currentDirection == CLOCKWISE;
+                game->currentDirection = CLOCKWISE;
             }
 
 
@@ -570,9 +565,9 @@ void playMove(Game game, playerMove move){
     }
     if(move.action == SAY_UNO) {
         printf("UNO!\n");
-        if(handSize(currentPlayer(game)) == 1) {
+        if(handSize(game->playerInfo[current].hand) == 1) {
             // well done! you've almost won!
-        } else if (handSize(previousPlayer)) == 1) {
+        } else if (handSize(game->playerInfo[previous].hand) == 1) {
             // silly billy!
             drawFourCards(game);
         }
@@ -585,9 +580,9 @@ void playMove(Game game, playerMove move){
 
     if(move.action == SAY_DUO) {
         printf("DUO!\n");
-        if(handSize(currentPlayer(game)) == 2) {
+        if(handSize(game->playerInfo[current].hand) == 2) {
             // well done! you've almost won!
-        } else if (handSize(previousPlayer)) == 2) {
+        } else if (handSize(game->playerInfo[previous].hand) == 2) {
             // silly billy!
             drawFourCards(game);
         }
@@ -600,9 +595,9 @@ void playMove(Game game, playerMove move){
 
     if(move.action == SAY_TRIO) {
         printf("TRIO!\n");
-        if(handSize(currentPlayer(game)) == 3) {
+        if(handSize(game->playerInfo[current].hand) == 3) {
             // well done! you've almost won!
-        } else if (handSize(previousPlayer)) == 3) {
+        } else if (handSize(game->playerInfo[previous].hand) == 3) {
             // silly billy!
             drawFourCards(game);
         }
@@ -614,7 +609,7 @@ void playMove(Game game, playerMove move){
 
 
     if(move.action == END_TURN) {
-        game->currentTurn++;
+        game->turnNumber++;
         game->previousPlayer = game->currentPlayer;
         if(game->currentDirection == CLOCKWISE) {
             game->currentPlayer = (game->currentPlayer+1)%4;
@@ -633,7 +628,7 @@ void playMove(Game game, playerMove move){
 
 
 
-    recordInHistory(Game game, playerMove move);
+    recordInHistory(game, move);
 
 
 // i'm not sure if this is totally finished yet, but it's better than before
@@ -704,9 +699,9 @@ int listSize(cardList list){
 
 
 void putCardInList(cardList list, Card card){
-    cardNode new = calloc(1, sizeof(node));
+    cardNode new = calloc(1, sizeof(cardnode));
     new->card = card;
-    new->next = list->next;
+    new->next = list->head;
     list->head = new;
 }
 
@@ -721,7 +716,7 @@ void recordInHistory(Game game, playerMove move) {
     }
     if(curr->turnNumber != game->turnNumber) {
         historyNode newTurnHistory = calloc(1, sizeof(historynode));
-        newTurnHistory->turnNumber = game->currentTurn;
+        newTurnHistory->turnNumber = game->turnNumber;
         newTurnHistory->playerNumber = game->currentPlayer;
         newTurnHistory->next = NULL;
         curr = newTurnHistory;
@@ -783,10 +778,34 @@ void freeMoveList(moveList list) {
 }
 
 
-void drawFourCards(game);
+void drawFourCards(Game game);
 
 
-void drawTwoCards(game);
+void drawTwoCards(Game game);
 
 
-int colorsMatch(Card first, Card second);
+int colorsMatch(Card first, Card second) {
+    int match = FALSE;
+    if(cardColor(first) == cardColor(second)) {
+        match = TRUE;
+    }
+    return match;
+}
+
+
+int valuesMatch(Card first, Card second) {
+    int match = FALSE;
+    if(cardValue(first) == cardValue(second)) {
+        match = TRUE;
+    }
+    return match;
+}
+
+
+int suitsMatch(Card first, Card second) {
+    int match = FALSE;
+    if(cardSuit(first) == cardSuit(second)) {
+        match = TRUE;
+    }
+    return match;
+}
