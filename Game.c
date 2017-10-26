@@ -118,7 +118,7 @@ typedef struct _game {
 
 
 // actions on card lists
-int handSize(cardList list);
+
 Card getNthCard(cardList list, int n);
 action getNthMove(historyList hist, int n);
 void putCardInList(cardList list, Card card);
@@ -132,6 +132,8 @@ void freeMoveList(moveList list);
 
 void drawFourCards(Game game);
 void drawTwoCards(Game game);
+
+static void flipDiscardIntoDraw(Game game);
 
 
 
@@ -278,6 +280,7 @@ Game newGame(int deckSize, value values[], color colors[], suit suits[]){
 }
 
 void destroyGame(Game game){ // i like how we get penalised for
+
                             // one-letter variables, but the prototype
                             // you give us has a one-letter variable.
                             // unless this is some sort of test....
@@ -407,12 +410,25 @@ Card handCard(Game game, int n) {
 }
 
 int playerCardCount(Game game, int player){
-    return handSize(game->playerInfo[player].hand);
+    int counter = 0;
+    if(game->playerInfo[player].hand->head == NULL) {
+        counter = 0;
+    } else {
+        counter++; // to account for the offset
+        cardNode curr = game->playerInfo[player].hand->head;
+        while(curr->next != NULL) {
+            curr = curr->next;
+            counter++;
+            
+        }
+    }        
+    return counter;
+    
 }
 
 int handCardCount(Game game){
     int player = game->currentPlayer;
-    return handSize(game->playerInfo[player].hand);
+    return playerCardCount(game->playerInfo[player].hand);
 
 }
 
@@ -560,9 +576,9 @@ void playMove(Game game, playerMove move){
     }
     if(move.action == SAY_UNO) {
         printf("UNO!\n");
-        if(handSize(game->playerInfo[current].hand) == 1) {
+        if(playerCardCount(game->playerInfo[current].hand) == 1) {
             // well done! you've almost won!
-        } else if (handSize(game->playerInfo[previous].hand) == 1) {
+        } else if (playerCardCount(game->playerInfo[previous].hand) == 1) {
             // silly billy!
             drawFourCards(game);
         }
@@ -575,9 +591,9 @@ void playMove(Game game, playerMove move){
 
     if(move.action == SAY_DUO) {
         printf("DUO!\n");
-        if(handSize(game->playerInfo[current].hand) == 2) {
+        if(playerCardCount(game->playerInfo[current].hand) == 2) {
             // well done! you've almost won!
-        } else if (handSize(game->playerInfo[previous].hand) == 2) {
+        } else if (playerCardCount(game->playerInfo[previous].hand) == 2) {
             // silly billy!
             drawFourCards(game);
         }
@@ -590,9 +606,9 @@ void playMove(Game game, playerMove move){
 
     if(move.action == SAY_TRIO) {
         printf("TRIO!\n");
-        if(handSize(game->playerInfo[current].hand) == 3) {
+        if(playerCardCount(game->playerInfo[current].hand) == 3) {
             // well done! you've almost won!
-        } else if (handSize(game->playerInfo[previous].hand) == 3) {
+        } else if (playerCardCount(game->playerInfo[previous].hand) == 3) {
             // silly billy!
             drawFourCards(game);
         }
@@ -644,7 +660,16 @@ void playMove(Game game, playerMove move){
 
 
 void removeCardFromHand(cardList list, Card card) {
-
+    assert(list->head != NULL);
+    cardNode prev = list->head;
+    cardNode curr = list->head;
+    while(curr->card != card && curr->next != NULL) {
+        prev = curr;
+        curr = curr->next;
+    }
+    prev->next = curr->next;
+    destroyCard(curr->card);
+    free(curr);
 }
 
 
@@ -653,10 +678,79 @@ void removeCardFromHand(cardList list, Card card) {
 
 
 
-void removeTopCard(cardList list);
+void removeTopCard(cardList list){
+    assert(list->head != NULL);
+    cardNode topCard = list->head->next;
+    cardNode nextCard = topCard->next;
+    list->head = nextCard;
+    destroyCard(topCard->card);
+    free(topCard);
+}
 
-void reviewPoints(Game game);
 
+
+void reviewPoints(Game game) {
+    int playerCounter = 0;
+    while(playerCounter < 4) {
+        int pointCounter = 0;
+        cardNode playerHand = game->playerInfo[playerCounter].hand->head;
+        while(playerHand->next != NULL) {
+            int tempCardPoint = 0;
+            if(cardValue(playerHand->card) == ZERO) {
+                tempCardPoint = 0;
+            }
+            if(cardValue(playerHand->card) == ONE) {
+                tempCardPoint = 1;
+            }
+            if(cardValue(playerHand->card) == DRAW_TWO) {
+                tempCardPoint = 2;
+            }
+            if(cardValue(playerHand->card) == THREE) {
+                tempCardPoint = 3;
+            }
+            if(cardValue(playerHand->card) == FOUR) {
+                tempCardPoint = 4;
+            }
+            if(cardValue(playerHand->card) == FIVE) {
+                tempCardPoint = 5;
+            }
+            if(cardValue(playerHand->card) == SIX) {
+                tempCardPoint = 6;
+            }
+            if(cardValue(playerHand->card) == SEVEN) {
+                tempCardPoint = 7;
+            }
+            if(cardValue(playerHand->card) == EIGHT) {
+                tempCardPoint = 8;
+            }
+            if(cardValue(playerHand->card) == NINE) {
+                tempCardPoint = 9;
+            }
+            if(cardValue(playerHand->card) == ADVANCE) {
+                tempCardPoint = 10;
+            }
+            if(cardValue(playerHand->card) == BACKWARDS) {
+                tempCardPoint = 11;
+            }
+            if(cardValue(playerHand->card) == CONTINUE) {
+                tempCardPoint = 12;
+            }
+            if(cardValue(playerHand->card) == DECLARE) {
+                tempCardPoint = 13;
+            }
+            if(cardValue(playerHand->card) == E) {
+                tempCardPoint = 14;
+            }
+            if(cardValue(playerHand->card) == F) {
+                tempCardPoint = 15;
+            }
+            pointCounter = pointCounter + tempCardPoint;;
+            playerHand = playerHand->next;
+        }
+        game->playerInfo[playerCounter].points = pointCounter;
+        playerCounter++;
+    }
+}
 
 
 void freeEntireList(cardList list) {
@@ -773,10 +867,41 @@ void freeMoveList(moveList list) {
 }
 
 
-void drawFourCards(Game game);
+void drawFourCards(Game game) {
+    while(game->discard->head != NULL) {
+        
+    }
+    
+}
 
 
 void drawTwoCards(Game game);
 
 
 int colorsMatch(Card first, Card second);
+
+/*static void flipDiscardIntoDraw(Game game) {
+    assert(game->draw->next == NULL);
+    cardNode curr = game->discard->next;
+    while(curr->next != NULL) {
+        
+    }
+}
+*/
+
+Card getNthCard(cardList list, int n){
+    cardNode curr = list->head;
+    int counter = 0;
+    if(list->head == 0) {
+        // do nothing
+    }
+    while(counter != n && curr->next != NULL) {
+        curr = curr->next;
+        counter++;
+    }
+    assert(curr->card != NULL);
+    return curr->card;
+
+}
+
+
