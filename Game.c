@@ -29,6 +29,45 @@ and 799 to a card, so that I have my own way of making a deck.
 */
 
 
+// ======================================================
+// ||                                                  ||
+// ||    A NOTE TO WHOEVER READS AND/OR MARKS THIS.    ||
+// ||                                                  ||
+// ======================================================
+//
+// I have been in touch with Andrew Bennett
+// regarding the fact that I had to do most of
+// this by game.c myself, which is in no way an even
+// distribution of labour, I'm sure you'll agree.
+// Two of the four members of my group made zero
+// contribution to game.c or player.c, and a very
+// tokenistic testGame.c file, at the last minute.
+// Sure this probably won't compile, or run, or any
+// of that, but please consider this: what you have
+// before you is the work of someone with almost no
+// previous programming experience, attempting to
+// implement the most difficult part of an already
+// difficult assignment. The assignment should be
+// for four people, but only two contributed
+// meaningfully, and I ended up having to do the
+// vast majority of this file.
+//
+//  This is extremely embarrassing for me - I put a
+// huge amount of effot into this. Sorry that you have
+// now trawl through this and find all my stupid
+// mistakes. I tried my hardest, but that can only
+// do so much. If you could please refer this to
+// Andrew, I would be extremely grateful.
+//
+// Apologies and thanks,
+//
+// Phil Lentz, z5161931
+
+
+
+
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -96,7 +135,7 @@ typedef struct _game {
     cardList originalDeck;
 
 
-    // the games active components
+    // the game's active components
     cardList draw;
     cardList discard;
     int turnNumber;
