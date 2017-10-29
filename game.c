@@ -36,6 +36,7 @@ and 799 to a card, so that I have my own way of making a deck.
 #include "Card.h"
 #include "Game.h"
 
+#define FIRST_DISCARD 28
 
 
 typedef struct _cardlist *cardList;
@@ -107,7 +108,7 @@ typedef struct _game {
 
 
     // info relevant to each individual player
-    player playerInfo[4];
+    player playerInfo[NUM_PLAYERS];
 
 
     // the move history
@@ -118,29 +119,32 @@ typedef struct _game {
 
 
 // actions on card lists
-int handSize(cardList list);
-Card getNthCard(cardList list, int n);
-action getNthMove(historyList hist, int n);
-void putCardInList(cardList list, Card card);
-void removeCardFromHand(cardList list, Card card);
-void removeTopCard(cardList list);
 
-void freeEntireList(cardList list);
-void freeHistoryList(historyList list);
-void recordInHistory(Game game, playerMove move);
-void freeMoveList(moveList list);
+static Card getNthCard(cardList list, int n);
+static void putCardTopOfList(cardList list, Card card);
+static void putCardEndOfList(cardList list, Card card);
+static void removeCardFromHand(cardList list, Card card);
+static void removeTopCard(cardList list);
 
-void drawFourCards(Game game);
-void drawTwoCards(Game game);
+static void freeEntireList(cardList list);
+static void freeHistoryList(historyList list);
+static void recordInHistory(Game game, playerMove move);
+static void freeMoveList(moveList list);
 
-int valuesMatch(Card first, Card second);
-int colorsMatch(Card first, Card second);
-int suitsMatch(Card first, Card second);
+static void drawFourCards(Game game);
+static void drawTwoCards(Game game);
+
+static void flipDiscardIntoDraw(Game game);
+
+static int checkDrawTwoNonsense(Game game, playerMove move);
+
+static int cardsMatch(Card first, Card second);
+
+static int checkPreviousMoves(Game game, playerMove move);
 
 
 
-
-Game newGame(int deckSize, value values[], color colors[], suit suits[]) {
+Game newGame(int deckSize, value values[], color colors[], suit suits[]){
 // deep breaths. let's go.
     Game new = calloc(1, sizeof(game));
     new->totalDeckSize = deckSize;
@@ -168,7 +172,7 @@ Game newGame(int deckSize, value values[], color colors[], suit suits[]) {
     while(counter < deckSize) {
         Card toAssign = newCard(values[originalDeckCounter],
             colors[originalDeckCounter], suits[originalDeckCounter]);
-        putCardInList(new->originalDeck, toAssign);
+        putCardEndOfList(new->originalDeck, toAssign);
         originalDeckCounter++;
     }
 
@@ -176,110 +180,39 @@ Game newGame(int deckSize, value values[], color colors[], suit suits[]) {
 // and another card for the discard pile)
 
     int drawCounter = 0;
-    while(drawCounter < 29) {
+    while(drawCounter < FIRST_DISCARD) {
         Card toAssign = newCard(values[drawCounter],
             colors[drawCounter], suits[drawCounter]);
-        putCardInList(new->draw, toAssign);
+        putCardEndOfList(new->draw, toAssign);
         drawCounter++;
     }
 
 // for the discard pile, we just take the 28th (29th, actually) card
-    Card toAssign = newCard(values[28], colors[28], suits[28]);
-    putCardInList(new->discard, toAssign);
+    Card toAssign = newCard(values[FIRST_DISCARD], colors[FIRST_DISCARD],
+        suits[FIRST_DISCARD]);
+    putCardTopOfList(new->discard, toAssign);
 
 
 
     int playerCounter = 0;
-    while(playerCounter < 4) {
+    while(playerCounter < NUM_PLAYERS) {
         new->playerInfo[playerCounter].points = 0;
         new->playerInfo[playerCounter].hand->head = NULL;
         playerCounter++;
     }
 
     int dealingCounter = 0;
-    while(dealingCounter < 28) {
+    while(dealingCounter < FIRST_DISCARD) {
         Card toAssign = newCard(values[dealingCounter],
             colors[dealingCounter], suits[dealingCounter]);
-        putCardInList(new->playerInfo[dealingCounter%4].hand, toAssign);
+        putCardTopOfList(new->playerInfo[dealingCounter%NUM_PLAYERS].hand, toAssign);
         dealingCounter++;
     }
 
     return new;
 
 
-/*    Game new = calloc(1, sizeof(game));
-    // the total number of cards we are given at the beginning
-    new->totalDeckSize = deckSize;
 
-
-
-
-    // set up the draw pile
-    new->draw.pileSize = deckSize-29;
-    new->draw.firstValue = calloc(deckSize, sizeof(value));
-    new->draw.firstColor = calloc(deckSize, sizeof(color));
-    new->draw.firstSuit = calloc(deckSize, sizeof(suit));
-
-    // assign the cards after 28 to the draw pile
-    // because the first 28 (0 - 27) will be dealt out,
-    // and one (28) for the discard pile
-    int drawCounter = 29;
-    while(counter < deckSize){
-        new->draw.firstValue[drawCounter] = values[drawCounter];
-        new->draw.firstColor[drawCounter] = colors[drawCounter];
-        new->draw.firstSuit[drawCounter] = suits[drawCounter];
-        drawCounter++;
-    }
-
-    // a copy of the original deck, for checking the number of things in it
-    new->originalDeck.pileSize = deckSize;
-    new->originalDeck.firstValue = calloc(deckSize, sizeof(value));
-    new->originalDeck.firstColor = calloc(deckSize, sizeof(color));
-    new->originalDeck.firstSuit = calloc(deckSize, sizeof(suit));
-
-    // and assigning
-    int originalDeckCounter = 0; // because the first 28 will be dealt out
-    while(counter < deckSize){
-        new->originalDeck.firstValue[originalDeckCounter] = values[originalDeckCounter];
-        new->originalDeck.firstColor[originalDeckCounter] = colors[originalDeckCounter];
-        new->originalDeck.firstSuit[originalDeckCounter] = suits[originalDeckCounter];
-        originalDeckCounter++;
-    }
-
-    new->playerInfo = calloc(NUM_PLAYERS, sizeof(player));
-    int playerCounter = 0;
-    while(playerCounter < 4){
-        new->playerInfo[playerCounter].hand.pileSize = 7;
-        new->playerInfo[playerCounter].hand.firstValue = calloc(deckSize-3, sizeof(value));
-        new->playerInfo[playerCounter].hand.firstColor = calloc(deckSize-3, sizeof(color));
-        new->playerInfo[playerCounter].hand.firstSuit = calloc(deckSize-3, sizeof(suit));
-        playerCounter++;
-    }
-
-    int dealCounter = 0;
-    while(dealCounter < 28){
-        new->playerInfo[dealCounter%4].hand.firstValue[(dealCounter - dealCounter%4)/4] = values[counter];
-        new->playerInfo[dealCounter%4].hand.firstColor[(dealCounter - dealCounter%4)/4] = colors[counter];
-        new->playerInfo[dealCounter%4].hand.firstSuits[(dealCounter - dealCounter%4)/4] = suits[counter];
-        dealCounter++;
-    }
-
-    new->turnNumber = 0;
-    new->currentDirection = CLOCKWISE;
-
-    // set up the discard pile
-    new->discard.pileSize = 1;
-    new->discard.firstValue = calloc(deckSize, sizeof(value));
-    new->discard.firstColor = calloc(deckSize, sizeof(color));
-    new->discard.firstSuit = calloc(deckSize, sizeof(suit));
-
-    // put the card after all the dealing in the discard pile
-    new->draw.firstValue[0] = values[28];
-    new->draw.firstColor[0] = colors[28];
-    new->draw.firstSuit[0] = suits[28];
-
-    return new;
-*/
 }
 
 void destroyGame(Game game){ // i like how we get penalised for
@@ -292,7 +225,7 @@ void destroyGame(Game game){ // i like how we get penalised for
     freeEntireList(game->discard);
     freeHistoryList(game->history);
     int playerCounter = 0;
-    while(playerCounter < 4) {
+    while(playerCounter < NUM_PLAYERS) {
         freeEntireList(game->playerInfo[playerCounter].hand);
         playerCounter++;
     }
@@ -300,25 +233,6 @@ void destroyGame(Game game){ // i like how we get penalised for
     free(game);
 
 
-    /*
-    free(g->playerInfo[playerCounter].hand.firstValue);
-    free(g->playerInfo[playerCounter].hand.firstColor);
-    free(g->playerInfo[playerCounter].hand.firstSuit);
-
-    free(g->draw.firstValue);
-    free(g->draw.firstColor);
-    free(g->draw.firstSuit);
-
-    free(g->discard.firstValue);
-    free(g->discard.firstColor);
-    free(g->discard.firstSuit);
-
-    free(g->originalDeck.firstValue[originalDeckCounter]);
-    free(g->originalDeck.firstColor[originalDeckCounter]);
-    free(g->originalDeck.firstSuit[originalDeckCounter]);
-
-    free(g);
-    */
 }
 
 // functions that have been implemented
@@ -339,14 +253,6 @@ int numOfSuit(Game game, suit suit){
         }
     }
 
-    /*while(counter < game->totalDeckSize){
-        if(game->originalDeck.firstSuit[counter] = suit){
-            suitCounter++;
-            counter++;
-        } else{
-            counter++;
-        }
-    }*/
     return suitCounter;
 }
 
@@ -412,12 +318,25 @@ Card handCard(Game game, int n) {
 }
 
 int playerCardCount(Game game, int player){
-    return handSize(game->playerInfo[player].hand);
+    int counter = 0;
+    if(game->playerInfo[player].hand->head == NULL) {
+        counter = 0;
+    } else {
+        counter++; // to account for the offset
+        cardNode curr = game->playerInfo[player].hand->head;
+        while(curr->next != NULL) {
+            curr = curr->next;
+            counter++;
+
+        }
+    }
+    return counter;
+
 }
 
 int handCardCount(Game game){
     int player = game->currentPlayer;
-    return handSize(game->playerInfo[player].hand);
+    return playerCardCount(game->playerInfo[player].hand);
 
 }
 
@@ -468,7 +387,7 @@ int turnMoves(Game game, int turn) {
 
 // functions yet to be implemented fully
 
-/*
+
 int gameWinner(Game game) {
     int playerCounter = 0;
     int winner = NOT_WINNER;
@@ -476,21 +395,81 @@ int gameWinner(Game game) {
         if
     }
 }
-*/
 
 
 
 
-/*
+
 int isValidMove(Game game, playerMove move){
     // aaaaaaaaaaaaaaaaaaaaaaa.
     // deep breaths.
     // let's go.
-    int valid == TRUE;
+    int valid = TRUE;
     Card topOfDiscard = topDiscard(game);
-    if(topOfDiscard.val == DRAW_TWO) {
-        if
+
+
+
+    valid = checkPreviousMoves(game, move);
+
+    if(cardValue(topOfDiscard) == DRAW_TWO) {
+        valid = checkDrawTwoNonsense(game, move);
+        // to deal with all the 'draw two'
+        // shenanigans and history diving
     }
+
+
+    if(move.action == PLAY_CARD && valid == TRUE) {
+        if(move.card == NULL) {
+            valid = FALSE;
+        } else {
+            if(cardValue(move.card) == ZERO) {
+                // all is well - unless it's a draw two?
+                if(cardValue(topOfDiscard) ==  DRAW_TWO) {
+                    valid = FALSE;
+                }
+            } else if(cardsMatch(move.card, topOfDiscard) != TRUE) {
+                valid = FALSE;
+                if(cardValue(topOfDiscard) == DECLARE) {
+                    if(cardColor(topOfDiscard) == game->history->head->moves->head->color) {
+                        valid = TRUE;
+                    }
+            } else if() {
+
+            } else if() {
+                
+            }
+        }
+    }
+
+
+    if(move.action == DRAW_CARD && valid == TRUE) {
+        if(topOfDiscard == DRAW_TWO) {
+            valid = checkDrawTwoNonsense(game, move);
+
+        }
+    }
+
+    if(move.action == END_TURN && valid == TRUE) {
+        if(game->history->head->moves->head->move == END_TURN) {
+            // is this convoluted enough yet?
+            valid = FALSE;
+        }
+    }
+
+    if(move.action [][][])
+
+
+
+
+
+
+
+
+
+        // aaaaaaaaaaaaaaaaaaaaaaa how do we deal with drawing?
+        // because i don't know if they've drawn both of their cards yet
+        // so we delve into the move history!!
+        // aha!
 
 
 
@@ -505,9 +484,8 @@ int isValidMove(Game game, playerMove move){
 
 
 
-
+    return valid;
 }
-*/
 
 
 
@@ -516,24 +494,6 @@ int isValidMove(Game game, playerMove move){
 
 
 void playMove(Game game, playerMove move){
-    /*if(move.action == DRAW_CARD){
-        Card topCard =
-        assert(game->playerInfo[currentPlayer(game)]->pile != NULL);
-        Node newNode = calloc(1,sizeof(node));
-        assert(newNode != NULL);
-        newNode->next = NULL;
-        newNode->value = topCard;
-
-        if(list->head == NULL) { //list is empty
-            list->head = newNode;
-        } else { //list contains elements
-            Node curr = list->head;
-            while(curr->next != NULL){ //find node before null
-                curr = curr->next;
-            }
-            curr->next = newNode;
-
-    }*/
 
 //    assert(isValidMove(game, move));
     cardList playersHand = game->playerInfo[currentPlayer(game)].hand;
@@ -542,11 +502,11 @@ void playMove(Game game, playerMove move){
     int previous = game->previousPlayer;
     if(move.action == DRAW_CARD) {
         Card topOfDraw = getNthCard(game->draw, 1);
-        putCardInList(playersHand, topOfDraw);
+        putCardTopOfList(playersHand, topOfDraw);
         removeTopCard(game->draw);
     }
     if(move.action == PLAY_CARD) {
-        putCardInList(game->discard, move.card);
+        putCardTopOfList(game->discard, move.card);
         removeCardFromHand(playersHand, move.card);
         if(cardValue(move.card) == DECLARE) {
             // [][][] does anything need to be put here, or is
@@ -565,9 +525,9 @@ void playMove(Game game, playerMove move){
     }
     if(move.action == SAY_UNO) {
         printf("UNO!\n");
-        if(handSize(game->playerInfo[current].hand) == 1) {
+        if(playerCardCount(game->playerInfo[current].hand) == 1) {
             // well done! you've almost won!
-        } else if (handSize(game->playerInfo[previous].hand) == 1) {
+        } else if (playerCardCount(game->playerInfo[previous].hand) == 1) {
             // silly billy!
             drawFourCards(game);
         }
@@ -580,9 +540,9 @@ void playMove(Game game, playerMove move){
 
     if(move.action == SAY_DUO) {
         printf("DUO!\n");
-        if(handSize(game->playerInfo[current].hand) == 2) {
+        if(playerCardCount(game->playerInfo[current].hand) == 2) {
             // well done! you've almost won!
-        } else if (handSize(game->playerInfo[previous].hand) == 2) {
+        } else if (playerCardCount(game->playerInfo[previous].hand) == 2) {
             // silly billy!
             drawFourCards(game);
         }
@@ -595,9 +555,9 @@ void playMove(Game game, playerMove move){
 
     if(move.action == SAY_TRIO) {
         printf("TRIO!\n");
-        if(handSize(game->playerInfo[current].hand) == 3) {
+        if(playerCardCount(game->playerInfo[current].hand) == 3) {
             // well done! you've almost won!
-        } else if (handSize(game->playerInfo[previous].hand) == 3) {
+        } else if (playerCardCount(game->playerInfo[previous].hand) == 3) {
             // silly billy!
             drawFourCards(game);
         }
@@ -648,8 +608,17 @@ void playMove(Game game, playerMove move){
 
 
 
-void removeCardFromHand(cardList list, Card card) {
-
+static void removeCardFromHand(cardList list, Card card) {
+    assert(list->head != NULL);
+    cardNode prev = list->head;
+    cardNode curr = list->head;
+    while(curr->card != card && curr->next != NULL) {
+        prev = curr;
+        curr = curr->next;
+    }
+    prev->next = curr->next;
+    destroyCard(curr->card);
+    free(curr);
 }
 
 
@@ -658,13 +627,82 @@ void removeCardFromHand(cardList list, Card card) {
 
 
 
-void removeTopCard(cardList list);
+static void removeTopCard(cardList list){
+    assert(list->head != NULL);
+    cardNode topCard = list->head->next;
+    cardNode nextCard = topCard->next;
+    list->head = nextCard;
+    destroyCard(topCard->card);
+    free(topCard);
+}
 
-void reviewPoints(Game game);
 
 
+static void reviewPoints(Game game) {
+    int playerCounter = 0;
+    while(playerCounter < 4) {
+        int pointCounter = 0;
+        cardNode playerHand = game->playerInfo[playerCounter].hand->head;
+        while(playerHand->next != NULL) {
+            int tempCardPoint = 0;
+            if(cardValue(playerHand->card) == ZERO) {
+                tempCardPoint = 0;
+            }
+            if(cardValue(playerHand->card) == ONE) {
+                tempCardPoint = 1;
+            }
+            if(cardValue(playerHand->card) == DRAW_TWO) {
+                tempCardPoint = 2;
+            }
+            if(cardValue(playerHand->card) == THREE) {
+                tempCardPoint = 3;
+            }
+            if(cardValue(playerHand->card) == FOUR) {
+                tempCardPoint = 4;
+            }
+            if(cardValue(playerHand->card) == FIVE) {
+                tempCardPoint = 5;
+            }
+            if(cardValue(playerHand->card) == SIX) {
+                tempCardPoint = 6;
+            }
+            if(cardValue(playerHand->card) == SEVEN) {
+                tempCardPoint = 7;
+            }
+            if(cardValue(playerHand->card) == EIGHT) {
+                tempCardPoint = 8;
+            }
+            if(cardValue(playerHand->card) == NINE) {
+                tempCardPoint = 9;
+            }
+            if(cardValue(playerHand->card) == ADVANCE) {
+                tempCardPoint = 10;
+            }
+            if(cardValue(playerHand->card) == BACKWARDS) {
+                tempCardPoint = 11;
+            }
+            if(cardValue(playerHand->card) == CONTINUE) {
+                tempCardPoint = 12;
+            }
+            if(cardValue(playerHand->card) == DECLARE) {
+                tempCardPoint = 13;
+            }
+            if(cardValue(playerHand->card) == E) {
+                tempCardPoint = 14;
+            }
+            if(cardValue(playerHand->card) == F) {
+                tempCardPoint = 15;
+            }
+            pointCounter = pointCounter + tempCardPoint;;
+            playerHand = playerHand->next;
+        }
+        game->playerInfo[playerCounter].points = pointCounter;
+        playerCounter++;
+    }
+}
 
-void freeEntireList(cardList list) {
+
+static void freeEntireList(cardList list) {
     if(list->head == NULL) {
         // do nothing
     } else {
@@ -682,7 +720,7 @@ void freeEntireList(cardList list) {
 
 
 
-int listSize(cardList list){
+static int listSize(cardList list){
     int counter = 0;
     if (list->head == NULL) {
         // do nothing
@@ -698,7 +736,7 @@ int listSize(cardList list){
 }
 
 
-void putCardInList(cardList list, Card card){
+static void putCardTopOfList(cardList list, Card card){
     cardNode new = calloc(1, sizeof(cardnode));
     new->card = card;
     new->next = list->head;
@@ -706,9 +744,24 @@ void putCardInList(cardList list, Card card){
 }
 
 
+static void putCardEndOfList(cardList list, Card card) {
+    cardNode new = calloc(1, sizeof(cardnode));
+    new->card = card;
+    new->next = NULL;
+    if(list->head == NULL) {
+        list->next = new;
+    } else {
+        cardNode curr = list->head;
+        while(curr->next != NULL) {
+            curr = curr->next;
+        }
+        curr->next = new;
+    }
+}
+
 
 // records the moves made by players for all eternity (until they're freed)
-void recordInHistory(Game game, playerMove move) {
+static void recordInHistory(Game game, playerMove move) {
     assert(game->history->head != NULL);
     historyNode curr = game->history->head;
     while(curr->next != NULL) {
@@ -746,7 +799,7 @@ void recordInHistory(Game game, playerMove move) {
 
 // this one is going to be rather painful (look at the previous function,
 // to see how convoluted setting up a history list is)
-void freeHistoryList(historyList list){
+static void freeHistoryList(historyList list){
     if(list->head == NULL) {
         // do nothing
     } else {
@@ -765,7 +818,7 @@ void freeHistoryList(historyList list){
 }
 
 
-void freeMoveList(moveList list) {
+static void freeMoveList(moveList list) {
     moveNode curr = list->head;
     moveNode prev = list->head;
     while(curr->next != NULL) {
@@ -778,34 +831,61 @@ void freeMoveList(moveList list) {
 }
 
 
-void drawFourCards(Game game);
+static void drawFourCards(Game game) {
+    while(game->discard->head != NULL) {
 
-
-void drawTwoCards(Game game);
-
-
-int colorsMatch(Card first, Card second) {
-    int match = FALSE;
-    if(cardColor(first) == cardColor(second)) {
-        match = TRUE;
     }
-    return match;
+
 }
 
 
-int valuesMatch(Card first, Card second) {
+static void drawTwoCards(Game game);
+
+
+static int colorsMatch(Card first, Card second);
+
+static void flipDiscardIntoDraw(Game game) {
+    assert(game->draw->next == NULL);
+    cardNode curr = game->discard->next;
+    while(curr->next != NULL) {
+        putCardEndOfList(game->draw, curr->card);
+        curr = curr->next;
+    }
+
+}
+
+
+static Card getNthCard(cardList list, int n){
+    cardNode curr = list->head;
+    int counter = 0;
+    if(list->head == 0) {
+        // do nothing
+    }
+    while(counter != n && curr->next != NULL) {
+        curr = curr->next;
+        counter++;
+    }
+    assert(curr->card != NULL);
+    return curr->card;
+
+}
+
+static int cardsMatch(Card first, Card second) {
     int match = FALSE;
     if(cardValue(first) == cardValue(second)) {
         match = TRUE;
+    } else if(cardSuit(first) == cardSuit(second)) {
+        match = TRUE;
+    } else if(cardColor(first) == cardColor(second)) {
+        match = TRUE;
     }
     return match;
 }
 
+static int checkDrawTwoNonsense(Game game, playerMove move) {
+    [][][]
+}
 
-int suitsMatch(Card first, Card second) {
-    int match = FALSE;
-    if(cardSuit(first) == cardSuit(second)) {
-        match = TRUE;
-    }
-    return match;
+static int checkPreviousMoves(Game game, playerMove move) {
+    [][][]
 }
